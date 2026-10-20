@@ -34,7 +34,7 @@ export async function sha256Hex(text: string): Promise<string> {
 	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function hmacKey(secret: string): Promise<CryptoKey> {
+async function hmacKey(secret: string) {
 	return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
 		"sign",
 		"verify",

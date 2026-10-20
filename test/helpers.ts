@@ -2,7 +2,8 @@ import { env, exports } from "cloudflare:workers";
 import { createMcpHandler } from "agents/mcp/server";
 import { vi } from "vitest";
 import { budgetStub } from "../src/budget";
-import { buildServer, toolDeps } from "../src/tools";
+import { buildServer } from "../src/tools";
+import { toolDeps } from "../src/worker-backend";
 
 export const HOST = "media.example.com";
 export const BASE = `https://${HOST}`;

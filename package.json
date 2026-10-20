@@ -1,26 +1,48 @@
 {
 	"name": "grok-media-mcp",
-	"version": "0.1.0",
+	"version": "0.2.0",
+	"description": "Grok images, video and speech for Claude, with hard spend caps: a Cloudflare Worker or a local stdio server.",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
+	"bin": {
+		"grok-media-mcp": "dist/grok-media-mcp.mjs"
+	},
+	"files": [
+		"dist/grok-media-mcp.mjs",
+		"README.md",
+		"LICENSE",
+		"NOTICE"
+	],
+	"engines": {
+		"node": ">=22.13"
+	},
 	"scripts": {
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"cf-typegen": "wrangler types",
-		"typecheck": "tsc --noEmit",
-		"test": "vitest run"
+		"build:local": "node scripts/build-local.mjs",
+		"prepack": "npm run build:local",
+		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.local.json",
+		"test": "vitest run",
+		"test:local": "vitest run --config vitest.local.config.ts"
 	},
 	"dependencies": {
-		"@cloudflare/workers-oauth-provider": "1.2.3",
-		"@modelcontextprotocol/server": "2.3.1",
-		"agents": "0.28.1",
-		"zod": "4.4.3"
+		"@napi-rs/keyring": "2.1.0"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-plugin": "1.4.5",
+		"@cloudflare/workers-oauth-provider": "1.2.3",
+		"@modelcontextprotocol/server": "2.3.1",
+		"@types/node": "22.20.5",
+		"@types/pngjs": "6.0.5",
+		"agents": "0.28.1",
+		"esbuild": "0.28.2",
+		"jpeg-js": "0.4.4",
+		"pngjs": "7.0.0",
 		"typescript": "6.0.3",
 		"vitest": "4.1.11",
-		"wrangler": "4.151.2"
+		"wrangler": "4.151.2",
+		"zod": "4.4.3"
 	}
 }

@@ -25,3 +25,30 @@ jobs:
       - run: npx wrangler types --check
       - run: npm run typecheck
       - run: npm test
+
+  local:
+    # Local mode runs on the owner's own computer: test it where people run it.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p tsconfig.local.json
+      - run: npm run build:local
+      - run: node dist/grok-media-mcp.mjs --help
+      - run: npm run test:local
+      - name: Package installs and runs on its own
+        shell: bash
+        run: |
+          npm pack --ignore-scripts
+          mkdir -p "$RUNNER_TEMP/install"
+          npm install --prefix "$RUNNER_TEMP/install" --ignore-scripts ./grok-media-mcp-*.tgz
+          node "$RUNNER_TEMP/install/node_modules/grok-media-mcp/dist/grok-media-mcp.mjs" --version
