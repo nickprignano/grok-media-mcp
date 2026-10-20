@@ -27,6 +27,13 @@ const RULES: Rule[] = [
 				"tweens?",
 				"minors?",
 				"juveniles?",
+				"youths?",
+				"adolescents?",
+				"youngsters?",
+				"freshm[ae]n",
+				"sophomores?",
+				"(?:1st|2nd|3rd|[4-9]th|1[0-2]th) graders?",
+				"loli",
 				"underage",
 				"boys?",
 				"girls?",
@@ -55,7 +62,8 @@ const RULES: Rule[] = [
 	},
 	{
 		reason: "it gives an age under 18",
-		pattern: /\b(?:[0-9]|1[0-7])[- ]?(?:years?|yrs?)[- ]?old\b|\baged? (?:[0-9]|1[0-7])\b/i,
+		pattern:
+			/\b(?:[0-9]|1[0-7])[- ]?(?:years?|yrs?|y\.?\s?o\.?)(?:[- ]?old)?\b|\baged? (?:[0-9]|1[0-7])\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)[- ]?years?[- ]?old\b/i,
 	},
 	{
 		reason: "it is sexual",
@@ -132,7 +140,8 @@ function familyPattern(familyNames: string | undefined): RegExp | undefined {
  * The reason never quotes the matched words, so a family name in the list is not echoed back.
  */
 export function checkContent(text: string, familyNames?: string): Refusal | undefined {
-	const normalized = text.normalize("NFKC");
+	// Zero-width characters and soft hyphens would otherwise split words past the \b checks.
+	const normalized = text.normalize("NFKC").replace(/[\u200b-\u200d\u2060\ufeff\u00ad]/g, "");
 	const family = familyPattern(familyNames);
 	if (family?.test(normalized)) {
 		return { refused: true, reason: "it names someone on the private family list" };

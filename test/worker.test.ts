@@ -11,6 +11,7 @@ const CLAUDE_CLIENT = "https://claude.ai/oauth/mcp-client-metadata";
 const CLAUDE_REDIRECT = "https://claude.ai/api/mcp/auth_callback";
 
 let keys: CryptoKeyPair;
+let upstreamNonce: string | undefined;
 let publicJwk: JsonWebKey & { kid: string };
 
 beforeAll(async () => {
@@ -41,7 +42,7 @@ function accessRoutes(idClaims?: Record<string, unknown>) {
 	return [
 		(url: URL) => (url.toString() === `${ISSUER}/.well-known/openid-configuration` ? json({ issuer: ISSUER, authorization_endpoint: `${ISSUER}/authorization`, token_endpoint: `${ISSUER}/token`, jwks_uri: `${ISSUER}/jwks` }) : undefined),
 		(url: URL) => (url.toString() === `${ISSUER}/jwks` || url.toString() === `${TEAM}/cdn-cgi/access/certs` ? json({ keys: [publicJwk] }) : undefined),
-		async (url: URL) => (url.toString() === `${ISSUER}/token` && idClaims ? json({ access_token: "upstream", id_token: await signJwt(idClaims) }) : undefined),
+		async (url: URL) => (url.toString() === `${ISSUER}/token` && idClaims ? json({ access_token: "upstream", id_token: await signJwt({ nonce: upstreamNonce, ...idClaims }) }) : undefined),
 		(url: URL) =>
 			url.toString() === CLAUDE_CLIENT
 				? json({ client_id: CLAUDE_CLIENT, client_name: "Claude", redirect_uris: [CLAUDE_REDIRECT], token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] })
@@ -87,6 +88,14 @@ describe("login", () => {
 	const authorizeUrl = (clientId: string, redirect: string) =>
 		`/authorize?${new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: redirect, state: "s1", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256", resource: `${BASE}/mcp` })}`;
 
+	it("refuses a sign-in link opened from another site", async () => {
+		mockFetch(...accessRoutes());
+		const response = await fetchWorker(authorizeUrl(CLAUDE_CLIENT, CLAUDE_REDIRECT), { headers: { referer: "https://mail.example.net/inbox" } });
+		expect(response.status).toBe(403);
+		const fromClaude = await fetchWorker(authorizeUrl(CLAUDE_CLIENT, CLAUDE_REDIRECT), { headers: { referer: "https://claude.ai/settings/connectors" } });
+		expect(fromClaude.status).toBe(200);
+	});
+
 	it("refuses any client that is not Claude", async () => {
 		mockFetch(...accessRoutes());
 		const response = await fetchWorker(authorizeUrl("https://evil.example.org/client.json", "https://evil.example.org/cb"));
@@ -113,6 +122,7 @@ describe("login", () => {
 		const toAccess = new URL(approve.headers.get("location")!);
 		expect(toAccess.toString().startsWith(`${ISSUER}/authorization`)).toBe(true);
 		expect(toAccess.searchParams.get("code_challenge_method")).toBe("S256");
+		upstreamNonce = toAccess.searchParams.get("nonce") ?? undefined;
 		const upstreamCookie = approve.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 		return fetchWorker(`/callback?${new URLSearchParams({ code: "abc", state: toAccess.searchParams.get("state")! })}`, {
 			headers: { cookie: upstreamCookie },
@@ -135,6 +145,8 @@ describe("login", () => {
 		["a wrong issuer", { iss: "https://other.example.com" }],
 		["an expired token", { exp: now() - 600 }],
 		["a token not valid yet", { nbf: now() + 600 }],
+		["a missing nonce", { nonce: undefined }],
+		["a wrong nonce", { nonce: "other" }],
 	])("denies %s", async (_label, change) => {
 		const response = await consentThenAccess({ iss: ISSUER, aud: env.ACCESS_CLIENT_ID, exp: now() + 300, iat: now(), sub: "u1", email: "owner@example.com", ...change });
 		expect(response.status).toBe(302);

@@ -60,6 +60,17 @@ export function clientAllowed(env: Env, clientId: string, redirectUri: string): 
 	return prefixes.some((prefix) => prefix.startsWith("https://") && clientId.startsWith(prefix)) && redirects.includes(redirectUri);
 }
 
+function refererAllowed(env: Env, referer: string): boolean {
+	let origin: string;
+	try {
+		origin = new URL(referer).origin;
+	} catch {
+		return false;
+	}
+	const allowed = new Set([env.PUBLIC_URL, ...list(env.ALLOWED_REDIRECT_URIS).map((uri) => new URL(uri).origin)]);
+	return allowed.has(origin);
+}
+
 const PAGE_HEADERS = {
 	"Content-Type": "text/html; charset=utf-8",
 	"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
@@ -107,6 +118,12 @@ export async function handleAuth(request: Request, env: AuthEnv): Promise<Respon
 	const oauth = env.OAUTH_PROVIDER;
 	try {
 		if (url.pathname === "/authorize" && request.method === "GET") {
+			// A real connect arrives from claude.ai, or with no Referer (the mobile apps). A link
+			// someone sent you from another site is refused: the confused-deputy case.
+			const referer = request.headers.get("Referer");
+			if (referer && !refererAllowed(env, referer)) {
+				return page("Not allowed", "<h1>Start from claude.ai</h1><p>This sign-in was opened from another site. If you meant to connect, start again from claude.ai's connector settings.</p>", 403);
+			}
 			const authRequest = await oauth.parseAuthRequest(request);
 			if (!clientAllowed(env, authRequest.clientId, authRequest.redirectUri)) {
 				return page("Not allowed", "<h1>This app can't connect here</h1><p>Only Claude can connect to this server.</p>", 403);
@@ -186,7 +203,7 @@ export async function handleAuth(request: Request, env: AuthEnv): Promise<Respon
 				headers.set("Location", authorizationErrorRedirect(original, "access_denied"));
 				return new Response(null, { status: 302, headers });
 			}
-			if (claims.nonce !== undefined && claims.nonce !== data.nonce) {
+			if (claims.nonce !== data.nonce) {
 				headers.set("Location", authorizationErrorRedirect(original, "access_denied"));
 				return new Response(null, { status: 302, headers });
 			}

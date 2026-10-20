@@ -27,7 +27,7 @@ No chat, search, code execution or generic file upload: only media.
 **Only you get in.** claude.ai connects with OAuth. The Worker is the authorization server, Cloudflare Access is
 the login, and one email is allowed. Dynamic client registration is off: only Claude's published client identity
 and its exact redirect URI are accepted, and the consent page is shown every time with a warning to allow it only
-right after you clicked Connect yourself. The Access ID token is checked for signature, issuer, audience, expiry,
+right after you clicked Connect yourself. A sign-in opened from any site other than claude.ai is refused. The Access ID token is checked for signature, issuer, audience, expiry,
 not-before and email. Access tokens last an hour and refresh tokens 30 days, rotating on use.
 
 **Nothing spends until you arm it.** Paid tools refuse unless you have armed the server on its `/inbox` page, which
@@ -105,7 +105,10 @@ Until every required secret is set, the Worker answers 503 to everything.
    - A custom rule that blocks requests to your host for `/mcp` and `/token` unless they come from Anthropic's
      published egress range (`160.79.104.0/21` when this was written; check Claude's connector docs).
    - A rate-limiting rule on `/f/`, `/authorize`, `/token` and `/callback`, for example 30 requests a minute per IP.
-6. Set a Cloudflare billing notification.
+     Don't skip it: every visit to `/authorize` writes to KV, and the free KV write allowance is what keeps your
+     sign-ins refreshing.
+6. Set a Cloudflare billing notification. The Images binding (previews and inbox re-encoding) has a free monthly
+   allowance of unique transformations; normal use stays well inside it.
 
 ### 4. Connect Claude
 

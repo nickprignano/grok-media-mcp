@@ -17,6 +17,15 @@ export class XaiError extends Error {
 
 type Fetcher = typeof fetch;
 
+const XAI_STATUS_HINT: Record<number, string> = {
+	400: "request rejected, possibly by xAI moderation",
+	401: "the xAI key is wrong or revoked",
+	402: "out of xAI credit",
+	403: "the xAI key is not allowed this model",
+	404: "model or job not found",
+	422: "invalid parameters",
+};
+
 export interface XaiImage {
 	bytes: Uint8Array;
 	mime: string;
@@ -67,9 +76,9 @@ export class XaiClient {
 				continue;
 			}
 			if (!response.ok) {
-				// Error bodies are not logged or returned in full: they can echo the prompt.
-				const detail = (await response.text()).slice(0, 200).replace(/\s+/g, " ");
-				throw new XaiError(`xAI answered ${response.status}: ${detail}`, response.status, response.status >= 500);
+				// The body is dropped: it can echo the prompt, and it would end up in the ledger.
+				await response.body?.cancel();
+				throw new XaiError(`xAI answered ${response.status}${XAI_STATUS_HINT[response.status] ? ` (${XAI_STATUS_HINT[response.status]})` : ""}`, response.status, response.status >= 500);
 			}
 			return response;
 		}

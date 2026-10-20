@@ -23,6 +23,10 @@ describe("content rules", () => {
 		["the Nike logo on a shirt", "logo"],
 		["Pikachu surfing", "logo"],
 		["a celebrity at a gala", "real, named person"],
+		["a 12yo on a bike", "under 18"],
+		["a sixteen-year-old driver", "under 18"],
+		["an adolescent reading", "children"],
+		["a 4th grader's drawing", "children"],
 	])("refuses %s", (prompt, reason) => {
 		expect(checkContent(prompt)?.reason).toContain(reason);
 	});
@@ -37,5 +41,7 @@ describe("content rules", () => {
 
 	it("is not fooled by full-width letters", () => {
 		expect(checkContent("ｋｉｄｓ at a party")).toBeDefined();
+		expect(checkContent("ki\u200bds at a party")).toBeDefined();
+		expect(checkContent("ki\u00adds at a party")).toBeDefined();
 	});
 });

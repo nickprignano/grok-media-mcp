@@ -54,6 +54,7 @@
 
 	"observability": {
 		"enabled": true,
-		"logs": { "invocation_logs": true }
+		// Request URLs would carry signed file links and login codes, so per-request logs are off.
+		"logs": { "invocation_logs": false }
 	}
 }

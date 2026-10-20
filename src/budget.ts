@@ -435,6 +435,7 @@ export class Budget extends DurableObject<Env> {
 		}
 		// Failed, moderated or expired at xAI: charge what xAI reports, else nothing.
 		this.settle(job.ledger_id, { actual: state.costMicro ?? 0, xaiRequestId: job.xai_id, result: { job_id: job.id } });
+		this.sql.exec("UPDATE ledger SET dedupe = NULL WHERE id = ?", job.ledger_id); // a retry starts a new video
 		this.finishJob(job, state.status === "expired" ? "expired" : "failed", state.error ?? state.status);
 	}
 

@@ -44,7 +44,8 @@ export const LIMITS = {
 	editSources: 5,
 	videoSeconds: 15,
 	imageBytes: 20 * 1024 * 1024,
-	videoBytes: 100 * 1024 * 1024,
+	// Held in memory inside the Durable Object (128 MB), so well under that. 15 s at 720p is far smaller.
+	videoBytes: 40 * 1024 * 1024,
 	audioBytes: 25 * 1024 * 1024,
 	fileDays: 30,
 	ledgerDays: 90,
@@ -118,6 +119,9 @@ export function missingSettings(env: Env): string[] {
 	const missing: string[] = REQUIRED.filter((name) => !env[name]);
 	for (const name of ["COOKIE_ENCRYPTION_KEY", "LINK_SIGNING_KEY"] as const) {
 		if (env[name] && env[name].length < 32) missing.push(`${name} (needs 32+ characters)`);
+	}
+	if (env.ACCESS_ISSUER && !/^https:\/\/[a-z0-9.-]+\/cdn-cgi\/access\/sso\/oidc\/[A-Za-z0-9_-]+$/.test(env.ACCESS_ISSUER)) {
+		missing.push("ACCESS_ISSUER (https://<team>.cloudflareaccess.com/cdn-cgi/access/sso/oidc/<client-id>, no trailing slash)");
 	}
 	if (env.PUBLIC_URL && !/^https:\/\/[a-z0-9.-]+$/.test(env.PUBLIC_URL)) {
 		missing.push("PUBLIC_URL (https://host, no path or trailing slash)");
