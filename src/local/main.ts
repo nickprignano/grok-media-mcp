@@ -2,9 +2,9 @@
 // Entry point. stdout carries the MCP protocol, so before anything else loads, every console
 // method is sent to stderr: one stray console.log would corrupt the connection.
 
-for (const name of ["log", "info", "debug", "warn"] as const) {
-	console[name] = (...args: unknown[]) => console.error(...args);
-}
+import { Console } from "node:console";
+
+globalThis.console = new Console({ stdout: process.stderr, stderr: process.stderr });
 
 // node:sqlite is stable in Node 24 but prints an "experimental" warning on 22; it's expected.
 const emitWarning = process.emitWarning.bind(process) as (...args: unknown[]) => void;

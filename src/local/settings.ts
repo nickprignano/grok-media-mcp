@@ -45,7 +45,9 @@ export function loadSettings(dir: string): LocalSettings {
 	let raw: Record<string, unknown> = {};
 	if (existsSync(file)) {
 		try {
-			raw = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+			const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
+			else throw new Error("not an object");
 		} catch {
 			warnings.push("config.json could not be read; using the default caps and no family names");
 		}

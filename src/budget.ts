@@ -143,6 +143,7 @@ export class Budget extends DurableObject<Env> {
 					await this.env.MEDIA.delete([file.key, `${file.key}.json`, ...(file.preview_key ? [file.preview_key] : [])]);
 					this.ledger.forgetFile(file.id);
 				}
+				this.ledger.markMaintained(now);
 			}
 		} finally {
 			await this.ctx.storage.setAlarm(this.ledger.nextWake(now));

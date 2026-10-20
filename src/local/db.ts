@@ -26,7 +26,11 @@ export function openSql(file: string, busyMs = 10_000): { sql: SqlDb; close(): v
 				db.exec("COMMIT");
 				return result;
 			} catch (error) {
-				db.exec("ROLLBACK");
+				try {
+					db.exec("ROLLBACK");
+				} catch {
+					// no transaction left to roll back; keep the original error
+				}
 				throw error;
 			} finally {
 				depth--;

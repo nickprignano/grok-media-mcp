@@ -96,6 +96,26 @@ describe("local ledger", () => {
 	});
 });
 
+describe("clock guard after pruning", () => {
+	it("still refuses when the clock went forward to prune the ledger and came back", () => {
+		const ledger = ledgerAt(join(tempDir(), "ledger.db"));
+		ledger.arm("blog", NOW);
+		expect(ledger.reserve(input(1000), NOW).ok).toBe(true);
+		const later = NOW + 91 * 86_400_000;
+		ledger.prune(later);
+		ledger.markMaintained(later);
+		expect(ledger.recentLedger()).toEqual([]);
+		ledger.arm("blog", NOW - 86_400_000);
+		expect(ledger.reserve(input(1000), NOW - 86_400_000 + 1)).toEqual({ ok: false, reason: expect.stringContaining("clock") });
+		expect(ledger.maintenanceDue(later + 1000)).toBe(false);
+	});
+
+	it("prunes an empty ledger without trouble", () => {
+		const ledger = ledgerAt(join(tempDir(), "ledger.db"));
+		expect(ledger.prune(NOW)).toEqual([]);
+	});
+});
+
 describe("settings", () => {
 	it("lets config.json lower the caps but never raise them", () => {
 		const dir = tempDir();
@@ -109,10 +129,12 @@ describe("settings", () => {
 	});
 
 	it("falls back to the defaults when config.json is broken", () => {
-		const dir = tempDir();
-		writeFileSync(join(dir, "config.json"), "{ not json");
-		const settings = loadSettings(dir);
-		expect(settings.caps).toEqual(CEILINGS);
-		expect(settings.warnings.length).toBe(1);
+		for (const text of ["{ not json", "null", "42", "[]"]) {
+			const dir = tempDir();
+			writeFileSync(join(dir, "config.json"), text);
+			const settings = loadSettings(dir);
+			expect(settings.caps).toEqual(CEILINGS);
+			expect(settings.warnings.length).toBe(1);
+		}
 	});
 });

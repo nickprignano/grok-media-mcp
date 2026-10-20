@@ -39,6 +39,8 @@ export function mediaPath(dir: string, key: string): string {
 export function writeMedia(dir: string, key: string, bytes: Uint8Array): string {
 	const path = mediaPath(dir, key);
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	// A day folder replaced by a link must not send the write somewhere else.
+	if (!realpathSync(dirname(path)).startsWith(realpathSync(mediaDir(dir)) + sep)) throw new Error("bad media folder");
 	writeFileSync(path, bytes, { mode: 0o600 });
 	return path;
 }
@@ -116,5 +118,6 @@ export async function upkeep(deps: LocalDeps): Promise<void> {
 			}
 			ledger.forgetFile(file.id);
 		}
+		ledger.markMaintained(now);
 	}
 }

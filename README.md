@@ -228,7 +228,8 @@ The data folder is `%APPDATA%\grok-media-mcp` on Windows, `~/Library/Application
   past that check: the caps and your prepaid balance are the limits that hold.
 - **The ledger is a file you own.** Desktop and Code share it, and every reservation takes the file's write lock, so
   caps hold across both. But deleting the file resets the caps, and setting the clock back is refused only while
-  the ledger remembers a later call. Treat the local caps as a brake against runaway use; the prepaid xAI balance
+  the ledger remembers a later call (moving it forward past midnight UTC does reopen the day cap; the session
+  and month caps still hold). Treat the local caps as a brake against runaway use; the prepaid xAI balance
   with auto top-up off is the hard limit.
 - **Caps in `config.json` can only go lower** than the built-in ones. Raising them means changing `src/config.ts`
   and rebuilding.

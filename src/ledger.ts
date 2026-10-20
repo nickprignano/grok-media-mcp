@@ -222,8 +222,13 @@ export class Ledger {
 				"SELECT COUNT(*) AS n FROM ledger WHERE ts > ? AND status IN ('reserved', 'settled', 'failed')",
 				now - MINUTE,
 			)[0].n;
+			// Pruned rows leave their newest time in meta, so moving the clock forward to prune the
+			// ledger and back again doesn't empty the guard.
 			const newest = this.options.guardClock
-				? (this.sql.all<{ t: number | null }>("SELECT MAX(ts) AS t FROM ledger")[0].t ?? 0)
+				? Math.max(
+						this.sql.all<{ t: number | null }>("SELECT MAX(ts) AS t FROM ledger")[0].t ?? 0,
+						Number(this.sql.all<{ v: string }>("SELECT v FROM meta WHERE k = 'newest_ts'")[0]?.v ?? 0),
+					)
 				: 0;
 
 			let reason: string | undefined;
@@ -457,7 +462,7 @@ export class Ledger {
 
 	/**
 	 * Folds ledger rows older than 90 days into monthly totals and returns files older than 30
-	 * days. The caller deletes their bytes, then calls forgetFile for each.
+	 * days. The caller deletes their bytes, calls forgetFile for each, then markMaintained.
 	 */
 	prune(now: number): ExpiredFile[] {
 		const cutoff = now - LIMITS.ledgerDays * DAY;
@@ -476,14 +481,23 @@ export class Ledger {
 					counts ? (row.actual ?? 0) : 0,
 				);
 			}
+			this.sql.run(
+				`INSERT INTO meta (k, v) SELECT 'newest_ts', CAST(MAX(ts) AS TEXT) FROM ledger WHERE ts < ? HAVING MAX(ts) IS NOT NULL
+				 ON CONFLICT (k) DO UPDATE SET v = CAST(MAX(CAST(v AS INTEGER), CAST(excluded.v AS INTEGER)) AS TEXT)`,
+				cutoff,
+			);
 			this.sql.run("DELETE FROM ledger WHERE ts < ?", cutoff);
 			this.sql.run("DELETE FROM jobs WHERE created < ? AND status != 'pending'", cutoff);
-			this.sql.run("INSERT OR REPLACE INTO meta (k, v) VALUES ('maintenance', ?)", String(now));
 		});
 		return this.sql.all<ExpiredFile>(
 			"SELECT id, key, preview_key FROM files WHERE created < ? LIMIT 500",
 			now - LIMITS.fileDays * DAY,
 		);
+	}
+
+	/** Called after a prune's files are deleted, so a failed delete is retried at the next run. */
+	markMaintained(now: number): void {
+		this.sql.run("INSERT OR REPLACE INTO meta (k, v) VALUES ('maintenance', ?)", String(now));
 	}
 
 	forgetFile(id: string): void {
