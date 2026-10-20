@@ -1,0 +1,60 @@
+// Worker config. Nothing personal belongs here: the hostname, the allowed login email,
+// the family-name list and every key are Worker secrets set in the Cloudflare dashboard.
+// See README.md, "Host your own copy".
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "grok-media-mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+	// The custom domain (set in the dashboard) is the only way in.
+	"workers_dev": false,
+	"preview_urls": false,
+
+	"durable_objects": {
+		"bindings": [{ "name": "BUDGET", "class_name": "Budget" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Budget"] }],
+
+	// No ids: Wrangler creates the namespace and bucket on the first deploy.
+	"kv_namespaces": [{ "binding": "OAUTH_KV" }],
+	"r2_buckets": [{ "binding": "MEDIA" }],
+	"images": { "binding": "IMAGES" },
+
+	"vars": {
+		// Spend caps in US dollars. Day and month are UTC.
+		"CAP_PER_CALL_USD": "1.50",
+		"CAP_PER_SESSION_USD": "3",
+		"CAP_PER_DAY_USD": "5",
+		"CAP_PER_MONTH_USD": "25",
+		"CALLS_PER_MINUTE": "6",
+		"ARM_HOURS": "2",
+		// Only Claude's hosted apps may connect.
+		"ALLOWED_CLIENT_ID_PREFIXES": "https://claude.ai/",
+		"ALLOWED_REDIRECT_URIS": "https://claude.ai/api/mcp/auth_callback"
+	},
+
+	// Set each one in the dashboard (Worker > Settings > Variables and Secrets, type Secret).
+	// Listing them here only types them; it never uploads a value.
+	"secrets": {
+		"required": [
+			"XAI_API_KEY",
+			"ACCESS_CLIENT_ID",
+			"ACCESS_CLIENT_SECRET",
+			"ACCESS_ISSUER",
+			"INBOX_ACCESS_AUD",
+			"COOKIE_ENCRYPTION_KEY",
+			"LINK_SIGNING_KEY",
+			"PUBLIC_URL",
+			"ALLOWED_EMAIL",
+			"FAMILY_NAMES"
+		]
+	},
+
+	"observability": {
+		"enabled": true,
+		// Request URLs would carry signed file links and login codes, so per-request logs are off.
+		"logs": { "invocation_logs": false }
+	}
+}

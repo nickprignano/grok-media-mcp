@@ -1,0 +1,10 @@
+grok-media-mcp
+
+The login flow follows the shape of Cloudflare's remote-mcp-cf-access demo
+(https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-cf-access) and the consent and
+upstream sign-in examples in @cloudflare/workers-oauth-provider. Both are:
+
+  MIT License
+  Copyright (c) 2025 Cloudflare, Inc.
+
+The xAI request shapes were written from xAI's public API reference (https://docs.x.ai).
