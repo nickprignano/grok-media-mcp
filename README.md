@@ -1,8 +1,13 @@
 # grok-media-mcp
 
-A remote [MCP](https://modelcontextprotocol.io) server that lets Claude make images, short videos and speech with
-xAI's Grok media models, with hard spend caps and a short list of things it refuses to make. It runs on one
-Cloudflare Worker and only lets its owner in: you host your own copy with your own xAI key.
+An [MCP](https://modelcontextprotocol.io) server that lets Claude make images, short videos and speech with xAI's
+Grok media models, with hard spend caps and a short list of things it refuses to make. You run your own copy with
+your own xAI key, one of two ways:
+
+- **On Cloudflare**, as a remote connector for claude.ai (web, desktop and mobile). It only lets its owner in.
+  See [Host your own copy](#host-your-own-copy).
+- **On your own computer**, for Claude Desktop and Claude Code on Windows, macOS or Linux. No Cloudflare account,
+  no domain. See [Run it on your own computer](#run-it-on-your-own-computer).
 
 Claude stays the model you talk to. When a chat needs media, Claude calls these tools, looks at the preview, and
 hands you the file.
@@ -18,11 +23,14 @@ hands you the file.
 | `make_speech` | Read text aloud with one of xAI's built-in voices | $15 per million characters |
 | `transcribe` | Transcribe an uploaded audio file | $0.10 per hour |
 | `media_budget` | Armed or not, spend today, this month and this session, caps | Free |
-| `list_media` | Recent files with fresh links | Free |
+| `list_media` | Recent files with fresh links (or paths, when run locally) | Free |
 
 No chat, search, code execution or generic file upload: only media.
 
 ## How it keeps you safe
+
+This section describes the Cloudflare version. Local mode keeps the same caps, content rules and arming, with the
+differences listed under [What's different locally](#whats-different-locally).
 
 **Only you get in.** claude.ai connects with OAuth. The Worker is the authorization server, Cloudflare Access is
 the login, and one email is allowed. Dynamic client registration is off: only Claude's published client identity
@@ -139,13 +147,110 @@ Until every required secret is set, the Worker answers 503 to everything.
 `ARM_HOURS` are in `wrangler.jsonc`. Model ids and prices are in `src/config.ts`; `media_budget` warns when the
 price table is more than 90 days old.
 
+## Run it on your own computer
+
+Local mode is the same tools as a program Claude Desktop or Claude Code starts on your computer. It talks to Claude
+over stdio (nothing listens on the network), keeps its ledger in a SQLite file and saves media in your user data
+folder.
+
+### 1. Install
+
+You need [Node.js](https://nodejs.org) 24 LTS (22.13 or newer works).
+
+- **From a release:** on this repository's Releases page, copy the link to the `.tgz` file of the latest release
+  and check its SHA-256 against the one in the release notes, then run
+  `npm install -g --ignore-scripts <link to the .tgz>`.
+- **From a clone:** `npm ci`, then `npm run build:local`. The program is `dist/grok-media-mcp.mjs`.
+
+It is not published on npm. A package called `grok-media-mcp` on npm is not this project.
+
+Find the full path of the program, which the next steps use:
+
+| | Command | Program path |
+|---|---|---|
+| Release install | `npm root -g` | `<that folder>/grok-media-mcp/dist/grok-media-mcp.mjs` |
+| Clone | | `<your clone>/dist/grok-media-mcp.mjs` |
+
+Also note the full path of Node itself: `where node` on Windows, `which node` on macOS and Linux.
+
+### 2. Your xAI key
+
+Make a separate xAI team and key as in [Host your own copy](#1-xai) step 1 (prepaid, auto top-up off, media models
+only). If you also run the Cloudflare version, give this copy its own key, so each one's spend shows separately.
+
+In a terminal, run `node <program path> set-key` (or `grok-media-mcp set-key` after a release install) and paste
+the key at the prompt. Nothing shows while you paste. It is saved in Windows Credential Manager or the macOS
+Keychain (on Linux, in a file only your account can read). macOS may ask whether Node can use the Keychain: choose
+Always Allow. Never put the key in a chat, and avoid putting it in Claude's config files, which are plain text.
+
+### 3. Connect Claude
+
+**Claude Desktop:** Settings > Developer > Edit Config, and add this to `claude_desktop_config.json` with your two
+full paths (on Windows, write each `\` in a path as `\\`). Then restart Claude Desktop.
+
+```json
+{
+  "mcpServers": {
+    "grok-media": {
+      "command": "/full/path/to/node",
+      "args": ["/full/path/to/grok-media-mcp.mjs"]
+    }
+  }
+}
+```
+
+**Claude Code:** `claude mcp add --scope user grok-media -- /full/path/to/node /full/path/to/grok-media-mcp.mjs`
+
+Leave the paid tools on "ask before using"; only `media_budget`, `video_status` and `list_media` are worth always
+allowing.
+
+### 4. Use it
+
+| Command (in a terminal) | What it does |
+|---|---|
+| `grok-media-mcp arm blog` | Allows paid calls for 2 hours (purpose: `blog`, `personal` or `testing`). Asks you to confirm the work isn't for kids |
+| `grok-media-mcp disarm` | Stops paid calls now |
+| `grok-media-mcp status` | Armed or not, spend against each cap, where the key and files are |
+| `grok-media-mcp add photo.jpg` | Adds your own JPEG or PNG image, or an audio file, as a tool input and prints its file id |
+| `grok-media-mcp where` | Prints the data folder |
+
+Without a release install, use `node <program path>` in place of `grok-media-mcp`.
+
+The data folder is `%APPDATA%\grok-media-mcp` on Windows, `~/Library/Application Support/grok-media-mcp` on macOS and
+`~/.local/share/grok-media-mcp` on Linux. Its `config.json` holds the caps and your private family-name list.
+
+### What's different locally
+
+- **No login.** Only programs running as you can start it. That keeps other people out, not malware on your own
+  account.
+- **Arming happens in a terminal.** `arm` and `add` refuse to run unless a person is typing in a terminal, so Claude
+  can't arm the server or feed it a file through a script by accident. A program that imitates a terminal could get
+  past that check: the caps and your prepaid balance are the limits that hold.
+- **The ledger is a file you own.** Desktop and Code share it, and every reservation takes the file's write lock, so
+  caps hold across both. But deleting the file resets the caps, and setting the clock back is refused only while
+  the ledger remembers a later call (moving it forward past midnight UTC does reopen the day cap; the session
+  and month caps still hold). Treat the local caps as a brake against runaway use; the prepaid xAI balance
+  with auto top-up off is the hard limit.
+- **Caps in `config.json` can only go lower** than the built-in ones. Raising them means changing `src/config.ts`
+  and rebuilding.
+- **Files stay on your computer** for 30 days. Tool results give their paths, which include your user name.
+- **Images you add are decoded and re-encoded** as a plain JPEG in JavaScript, which drops location and camera
+  data, colour profiles and anything appended to the file. WebP and other formats: export them as JPEG first.
+  Audio is copied as it is.
+- **Logs** go to Claude's MCP log (stderr): the tool, status and cost, never prompts or the key.
+
 ## Development
 
 ```sh
 npm ci
 npm run typecheck
-npm test          # runs in workerd with xAI and Access mocked: no account, no spend
+npm test              # the Worker, in workerd with xAI and Access mocked: no account, no spend
+npm run build:local   # bundles local mode into dist/grok-media-mcp.mjs
+npm run test:local    # local mode in Node, with xAI mocked and a temporary data folder
 ```
+
+The ledger (`src/ledger.ts`), the tools (`src/tools.ts`), the xAI client and the content rules are shared by both
+versions. `src/worker-backend.ts` and `src/local/backend.ts` supply each one's storage.
 
 Dependencies are pinned exactly. Update them through Dependabot PRs reviewed by hand.
 

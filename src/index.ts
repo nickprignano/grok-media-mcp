@@ -5,7 +5,8 @@ import { budgetStub } from "./budget";
 import { missingSettings, publicHost } from "./config";
 import { serveFile } from "./files";
 import { handleInbox } from "./inbox";
-import { buildServer, toolDeps } from "./tools";
+import { buildServer } from "./tools";
+import { toolDeps } from "./worker-backend";
 
 export { Budget } from "./budget";
 

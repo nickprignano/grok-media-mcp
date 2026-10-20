@@ -73,7 +73,17 @@ function dollars(value: string | undefined, fallback: number): number {
 	return Number.isFinite(n) && n >= 0 ? Math.round(n * USD) : fallback;
 }
 
-export function readCaps(env: Env): Caps {
+/** The cap settings, as Worker vars or the local config file gives them (strings). */
+export interface CapSettings {
+	CAP_PER_CALL_USD?: string;
+	CAP_PER_SESSION_USD?: string;
+	CAP_PER_DAY_USD?: string;
+	CAP_PER_MONTH_USD?: string;
+	CALLS_PER_MINUTE?: string;
+	ARM_HOURS?: string;
+}
+
+export function readCaps(env: CapSettings): Caps {
 	const calls = Number(env.CALLS_PER_MINUTE);
 	const hours = Number(env.ARM_HOURS);
 	return {
@@ -115,7 +125,9 @@ const REQUIRED = [
 
 // Names of required settings that are missing or too weak. The server refuses all traffic
 // until this is empty, so a half-configured deploy fails closed.
-export function missingSettings(env: Env): string[] {
+type Settings = Partial<Record<(typeof REQUIRED)[number], string>>;
+
+export function missingSettings(env: Settings): string[] {
 	const missing: string[] = REQUIRED.filter((name) => !env[name]);
 	for (const name of ["COOKIE_ENCRYPTION_KEY", "LINK_SIGNING_KEY"] as const) {
 		if (env[name] && env[name].length < 32) missing.push(`${name} (needs 32+ characters)`);
@@ -129,6 +141,6 @@ export function missingSettings(env: Env): string[] {
 	return missing;
 }
 
-export function publicHost(env: Env): string {
+export function publicHost(env: { PUBLIC_URL: string }): string {
 	return new URL(env.PUBLIC_URL).host;
 }
