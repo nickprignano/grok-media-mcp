@@ -1,10 +1,13 @@
 name: Release
 
-# Pushing a tag like v0.2.0 builds the local-mode package and attaches it to a GitHub release
-# with its SHA-256, so people install a fixed file instead of whatever a registry serves.
+# Builds the local-mode package and attaches it to a GitHub release with its SHA-256, so people
+# install a fixed file instead of whatever a registry serves. Runs when a tag like v0.2.0 is
+# pushed, or from Actions > Release > Run workflow on main, which tags main with the version in
+# package.json.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,7 +30,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          version="v$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME}"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            [ "$GITHUB_REF_NAME" = "main" ] || { echo "Run this from main."; exit 1; }
+            tag="$version"
+          fi
+          [ "$tag" = "$version" ] || { echo "Tag $tag does not match package.json $version."; exit 1; }
           file=$(ls grok-media-mcp-*.tgz)
           sum=$(sha256sum "$file" | cut -d' ' -f1)
           printf 'Local mode package.\n\nSHA-256 of %s: `%s`\n\nInstall: see the README, "Run it on your own computer".\n' "$file" "$sum" > notes.md
-          gh release create "$GITHUB_REF_NAME" "$file" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          gh release create "$tag" "$file" --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md
